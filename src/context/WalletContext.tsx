@@ -7,10 +7,12 @@ import { Keypair } from "@solana/web3.js";
 import { FirstCard } from "@/components/Cards";
 import nacl from "tweetnacl";
 import {ethers} from "ethers";
+import keyPair = nacl.signProps.keyPair;
 
 interface Account {
     publicKey: string;
     privateKey: string;
+    keyPair:keyPair
 }
 
 interface WalletContextType {
@@ -46,21 +48,24 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
         setCurrCard((prev) => prev - 1);
         // Additional logic to update `currentCard` based on `currCard` index if needed
     };
-
+    //@ts-ignore
     const generateAccount = (mnemonic: string, index: number,pathType:string): Account|null => {
 
         try {
             const seedBuffer = mnemonicToSeedSync(mnemonic);
-            const path = `m/44'/${pathType}'/0'/${index}'`;
+            // const path = `m/44'/${pathType}'/0'/${index}'`;
+            const path = `m/44'/${pathType}'/${index}'/0'`;
+            // m/44'/501'/${currentIndex}'/0'
+
             const { key: derivedSeed } = derivePath(path, seedBuffer.toString("hex"));
 
             let publicKeyEncoded: string;
             let privateKeyEncoded: string;
-
+            let keypair = null;
             if (pathType === "501") {
                 // Solana
                 const { secretKey } = nacl.sign.keyPair.fromSeed(derivedSeed);
-                const keypair = Keypair.fromSecretKey(secretKey);
+                keypair = Keypair.fromSecretKey(secretKey);
 
                 privateKeyEncoded = bs58.encode(secretKey);
                 publicKeyEncoded = keypair.publicKey.toBase58();
@@ -74,10 +79,12 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 return null;
             }
-
+            if(keypair)
             return {
                 publicKey: publicKeyEncoded,
                 privateKey: privateKeyEncoded,
+                //@ts-ignore
+                keyPair:keypair
             };
         } catch (error) {
 

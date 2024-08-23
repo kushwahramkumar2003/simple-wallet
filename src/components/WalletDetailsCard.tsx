@@ -10,11 +10,9 @@ import { cn } from "@/lib/utils";
 import { Eye, EyeOff, Copy } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
-import {Connection, PublicKey} from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import axios from "axios";
 import constants from "@/lib/constaints";
-
-
 
 export const WalletDetailsCard = () => {
     const { toast } = useToast();
@@ -24,6 +22,7 @@ export const WalletDetailsCard = () => {
     const [balance, setBalance] = useState<number | null>(null);
     const [usdcAmount, setUsdcAmount] = useState<number | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
+    const [transactions, setTransactions] = useState<any[]>([]);
 
     const currentAccount = accounts.find((account) => account.publicKey === currAccount);
 
@@ -33,16 +32,16 @@ export const WalletDetailsCard = () => {
     };
 
     useEffect(() => {
-        async function fetchBalance() {
+        async function fetchBalanceAndTransactions() {
             if (!currAccount) return;
 
             setLoading(true);
             try {
-                console.log("uri ",constants.NEXT_ALCHEMY_URI)
                 const connection = new Connection(constants.NEXT_ALCHEMY_URI || "");
+
+                // Fetch balance
                 const balanceLamports = await connection.getBalance(new PublicKey(currAccount));
                 setBalance(balanceLamports / 1e9);
-
 
                 const { data } = await axios.get("https://api.coingecko.com/api/v3/simple/price", {
                     params: {
@@ -52,15 +51,26 @@ export const WalletDetailsCard = () => {
                 });
                 setUsdcAmount(balanceLamports / 1e9 * data.solana.usd);
 
+                // Fetch recent transactions
+                const signatures = await connection.getSignaturesForAddress(new PublicKey(currAccount), { limit: 4 });
+                const fetchedTransactions = await Promise.all(
+                    signatures.map(async (signatureInfo) => {
+                        const tx = await connection.getTransaction(signatureInfo.signature, { commitment: 'confirmed' });
+                        return tx;
+                    })
+                );
+                console.log("fetchedTransactions",fetchedTransactions)
+                setTransactions(fetchedTransactions);
+
             } catch (error) {
-                console.error("Error fetching balance:", error);
-                toast({ description: "Failed to fetch balance." });
+                console.error("Error fetching data:", error);
+                toast({ description: "Failed to fetch data." });
             } finally {
                 setLoading(false);
             }
         }
 
-        fetchBalance();
+        fetchBalanceAndTransactions();
     }, [currAccount, toast]);
 
     return (
@@ -190,23 +200,49 @@ export const WalletDetailsCard = () => {
                                     </Button>
                                 </div>
                             </div>
-                            <div className="w-full bg-gray-700 p-4 rounded-lg shadow-lg mt-4">
-                                <h3 className="text-white text-lg mb-2">Transaction History</h3>
-                                <div className="text-gray-300 space-y-2">
-                                    <div className="flex justify-between">
-                                        <span>Received 1.2 SOL</span>
-                                        <span className="text-green-400">+1.2 SOL</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Sent 0.8 SOL</span>
-                                        <span className="text-red-400">-0.8 SOL</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span>Received 0.5 SOL</span>
-                                        <span className="text-green-400">+0.5 SOL</span>
-                                    </div>
+
+                            {/* Transactions */}
+                            <div className="w-full mt-6">
+                                <h4 className="text-lg text-gray-300 mb-3">Recent Transactions</h4>
+                                <div className="flex flex-col gap-2 overflow-y-scroll max-h-64 scrollbar-hide hide-scrollbar">
+                                    {transactions.length > 0 ? (
+                                        transactions.map((tx, index) => {
+                                            const { meta, transaction, blockTime } = tx || {};
+                                            if (!meta || !transaction || !blockTime) return null;
+
+                                            const isSent = meta.preBalances[1] > meta.postBalances[1];
+
+                                            const amount = Math.abs(meta.postBalances[1] - meta.preBalances[1]) / 1e9;
+                                            const time = new Date(blockTime * 1000).toLocaleString();
+
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    className="p-4 bg-gray-800 rounded-lg flex items-center justify-between text-white shadow-lg"
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        {isSent ? (
+                                                            <FaArrowUp className="text-red-500" />
+                                                        ) : (
+                                                            <FaArrowDown className="text-green-500" />
+                                                        )}
+                                                        <div>
+                                                            <p className="font-medium">
+                                                                {isSent ? "Sent" : "Received"}
+                                                            </p>
+                                                            <p className="text-sm text-gray-400">{time}</p>
+                                                        </div>
+                                                    </div>
+                                                    <p className="text-lg font-semibold">{amount.toFixed(4)} SOL</p>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <p className="text-gray-400">No recent transactions found.</p>
+                                    )}
                                 </div>
                             </div>
+
                         </>
                     )}
                 </CardFooter>
