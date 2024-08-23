@@ -1,8 +1,12 @@
-"use client"
+"use client";
 import { createContext, useContext, useState, ReactNode } from "react";
-import { generateMnemonic, mnemonicToSeedSync } from "bip39";
+import {generateMnemonic, mnemonicToSeed, mnemonicToSeedSync} from "bip39";
+import bs58 from "bs58";
 import { derivePath } from "ed25519-hd-key";
-import {Keypair} from "@solana/web3.js";
+import { Keypair } from "@solana/web3.js";
+import { FirstCard } from "@/components/Cards";
+import nacl from "tweetnacl";
+import {ethers} from "ethers";
 
 interface Account {
     publicKey: string;
@@ -11,7 +15,7 @@ interface Account {
 
 interface WalletContextType {
     currCard: number;
-    nextCard: () => void;
+    nextCard: (card: JSX.Element) => void;
     prevCard: () => void;
     walletType: string;
     setWalletType: (type: string) => void;
@@ -24,6 +28,7 @@ interface WalletContextType {
     addAccount: () => void;
     restoreWallet: (mnemonic: string) => void;
     createWallet: () => void;
+    currentCard: JSX.Element;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -35,38 +40,88 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [recoveryPhrase, setRecoveryPhrase] = useState<string[]>([]);
     const [accounts, setAccounts] = useState<Account[]>([]);
+    const [currentCard, setCurrentCard] = useState<JSX.Element>(<FirstCard />);
 
-    const nextCard = () => setCurrCard((prev) => prev + 1);
-    const prevCard = () => setCurrCard((prev) => prev - 1);
+    const prevCard = () => {
+        setCurrCard((prev) => prev - 1);
+        // Additional logic to update `currentCard` based on `currCard` index if needed
+    };
+
+    const generateAccount = (mnemonic: string, index: number,pathType:string): Account|null => {
+
+        try {
+            const seedBuffer = mnemonicToSeedSync(mnemonic);
+            const path = `m/44'/${pathType}'/0'/${index}'`;
+            const { key: derivedSeed } = derivePath(path, seedBuffer.toString("hex"));
+
+            let publicKeyEncoded: string;
+            let privateKeyEncoded: string;
+
+            if (pathType === "501") {
+                // Solana
+                const { secretKey } = nacl.sign.keyPair.fromSeed(derivedSeed);
+                const keypair = Keypair.fromSecretKey(secretKey);
+
+                privateKeyEncoded = bs58.encode(secretKey);
+                publicKeyEncoded = keypair.publicKey.toBase58();
+            } else if (pathType === "60") {
+                // Ethereum
+                const privateKey = Buffer.from(derivedSeed).toString("hex");
+                privateKeyEncoded = privateKey;
+
+                const wallet = new ethers.Wallet(privateKey);
+                publicKeyEncoded = wallet.address;
+            } else {
+                return null;
+            }
+
+            return {
+                publicKey: publicKeyEncoded,
+                privateKey: privateKeyEncoded,
+            };
+        } catch (error) {
+
+            return null;
+        }
 
 
-    const generateAccount = (mnemonic: string, index: number): Account => {
-        const seed = mnemonicToSeedSync(mnemonic); // Generate seed from mnemonic
-        const derivedSeed = derivePath(`m/44'/501'/${index}'/0'`, seed.toString("hex")).key;
-        const keypair = Keypair.fromSeed(derivedSeed.slice(0, 32));
 
-        const publicKey = keypair.publicKey.toBase58();
-        const privateKey = Buffer.from(keypair.secretKey).toString("hex");
 
-        return { publicKey, privateKey };
+
+        // const seed = mnemonicToSeedSync(mnemonic);
+        // const derivedSeed = derivePath(`m/44'/501'/${index}'/0'`, seed.toString("hex")).key;
+        // const { secretKey } = nacl.sign.keyPair.fromSeed(derivedSeed);
+        // const keypair = Keypair.fromSecretKey(secretKey);
+        // let privateKeyEncoded = bs58.encode(secretKey);
+        // let publicKeyEncoded = keypair.publicKey.toBase58();
+        // return { publicKey:publicKeyEncoded, privateKey:privateKeyEncoded };
+
     };
 
     const createWallet = () => {
         const mnemonic = generateMnemonic();
         setRecoveryPhrase(mnemonic.split(" "));
-        const newAccount = generateAccount(mnemonic, 0);
+        const newAccount = generateAccount(mnemonic, 0,"501");
+        if(newAccount)
         setAccounts([newAccount]);
     };
 
     const restoreWallet = (mnemonic: string) => {
         setRecoveryPhrase(mnemonic.split(" "));
-        const restoredAccount = generateAccount(mnemonic, 0);
+        const restoredAccount = generateAccount(mnemonic, 0,"501");
+        if(restoredAccount)
         setAccounts([restoredAccount]);
     };
 
     const addAccount = () => {
-        const newAccount = generateAccount(recoveryPhrase.join(" "), accounts.length);
+        const newAccount = generateAccount(recoveryPhrase.join(" "), accounts.length,"501");
+        if(newAccount)
         setAccounts([...accounts, newAccount]);
+    };
+
+    const nextCard = (card: JSX.Element) => {
+        setCurrentCard(card);
+        setCurrCard((prev) => prev + 1);
     };
 
     return (
@@ -86,6 +141,7 @@ export const WalletProvider = ({ children }: { children: ReactNode }) => {
                 addAccount,
                 restoreWallet,
                 createWallet,
+                currentCard,
             }}
         >
             {children}
