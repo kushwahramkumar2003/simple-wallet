@@ -12,8 +12,9 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useToast } from "@/components/ui/use-toast";
 import {Connection, PublicKey} from "@solana/web3.js";
 import axios from "axios";
+import constants from "@/lib/constaints";
 
-const ALCHEMY_URI = process.env.ALCHEMY_URI;
+
 
 export const WalletDetailsCard = () => {
     const { toast } = useToast();
@@ -37,8 +38,8 @@ export const WalletDetailsCard = () => {
 
             setLoading(true);
             try {
-                console.log("uri ",ALCHEMY_URI)
-                const connection = new Connection(ALCHEMY_URI || "");
+                console.log("uri ",constants.NEXT_ALCHEMY_URI)
+                const connection = new Connection(constants.NEXT_ALCHEMY_URI || "");
                 const balanceLamports = await connection.getBalance(new PublicKey(currAccount));
                 setBalance(balanceLamports / 1e9);
 
