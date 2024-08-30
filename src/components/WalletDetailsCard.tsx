@@ -388,20 +388,22 @@ export const WalletDetailsCard = () => {
                 </div>
 
 
+                {
+                    tokens.length > 0 && <div className="w-full">
+                      <h4 className="text-lg text-gray-300 mb-3">Your Tokens</h4>
+                      <div className="flex flex-col gap-4">
+                        {tokens.map((token, index) => (
+                            <Tokens
+                                key={index}
+                                mint={token.mint}
+                                amount={token.amount}
+                                decimals={token.decimals}
+                            />
+                        ))}
+                      </div>
+                    </div>
+                }
 
-                <div className="w-full">
-                  <h4 className="text-lg text-gray-300 mb-3">Your Tokens</h4>
-                  <div className="flex flex-col gap-4">
-                    {tokens.map((token, index) => (
-                        <Tokens
-                            key={index}
-                            mint={token.mint}
-                            amount={token.amount}
-                            decimals={token.decimals}
-                        />
-                    ))}
-                  </div>
-                </div>
 
                 {/* Transactions */}
                 <div className="w-full mt-6">
