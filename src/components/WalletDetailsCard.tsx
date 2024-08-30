@@ -323,14 +323,14 @@ export const WalletDetailsCard = () => {
                               value={currAccount}
                               readOnly
                               className="cursor-pointer bg-gray-700 text-white px-4 py-2 rounded-md w-full"
-                              onClick={() => handleCopy("Private")}
+                              onClick={() => handleCopy("public")}
                             />
                           </div>
                           <Button
                             type="button"
                             size="sm"
                             className="bg-blue-600 hover:bg-blue-500 text-white px-3 ml-2 rounded-md"
-                            onClick={() => handleCopy("Private")}
+                            onClick={() => handleCopy("public")}
                           >
                             <Copy className="h-5 w-5" />
                           </Button>
