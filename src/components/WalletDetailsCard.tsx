@@ -42,6 +42,8 @@ import constants from "@/lib/constaints";
 import Send from "./Send";
 import { Label } from "./ui/label";
 import { Input } from "./ui/input";
+import Tokens, {TokenProps} from "@/components/Tokens";
+import {getUserTokens} from "@/actions/tokenActions";
 
 export const WalletDetailsCard = () => {
   const { Canvas } = useQRCode();
@@ -51,6 +53,7 @@ export const WalletDetailsCard = () => {
   const [currAccount, setCurrAccount] = useState<string>(
       accounts[0]?.publicKey || ""
   );
+  const [tokens,setTokens] = useState<TokenProps[]>([])
   const [showKeys, setShowKeys] = useState<boolean>(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [usdcAmount, setUsdcAmount] = useState<number | null>(null);
@@ -85,6 +88,8 @@ export const WalletDetailsCard = () => {
       duration: 2000,
     });
   };
+
+
 
   useEffect(() => {
     async function fetchBalanceAndTransactions() {
@@ -147,8 +152,18 @@ export const WalletDetailsCard = () => {
     }
   }, [accounts]);
 
-  useEffect(() => {
+  useEffect( () => {
     // console.log("useEffect 2 called.")
+
+    async function fetch(){
+      try {
+        const res = await getUserTokens(currAccount);
+        setTokens(res)
+      }catch (err){
+      console.log("Failed to fetch user data:", err);
+      }
+    }
+    fetch();
     const selectedAccount = accounts.find(
         (account) => account.publicKey === currAccount
     );
@@ -282,145 +297,162 @@ export const WalletDetailsCard = () => {
               <p className="text-gray-400">Loading balance...</p>
             </div>
           ) : (
-            <>
-              <div className="w-full flex flex-col items-center bg-gray-800 p-4 rounded-lg shadow-lg">
-                <div className="text-center mb-4">
-                  <h3 className="text-lg text-gray-300">Balance</h3>
-                  <p className="text-3xl font-semibold text-white">
-                    {balance?.toFixed(2) || "—"} SOL
-                  </p>
-                  <p className="text-md text-gray-400">
-                    ≈ {usdcAmount?.toFixed(2) || "—"} USDC
-                  </p>
-                </div>
-                <div className="flex gap-4">
-                  <Send />
-                  <Dialog>
-                    <DialogTrigger asChild>
-                      <Button className="bg-blue-500 hover:bg-blue-400 text-white flex items-center gap-2 px-4 py-2 rounded-lg">
-                        <FaArrowDown className="text-xl" />
-                        Receive
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-md bg-gray-800 p-6 rounded-lg shadow-xl">
-                      <DialogHeader>
-                        <DialogTitle className="text-xl font-semibold text-white">
-                          Receive SOL
-                        </DialogTitle>
-                        <DialogDescription className="text-gray-300 mt-2">
-                          Share your public key below to receive payments or
-                          transfers to your account.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="flex flex-col items-center space-y-4 mt-4">
-                        <div className="flex flex-row items-center w-full">
-                          <div className="flex-1">
-                            <Label htmlFor="publicKey" className="sr-only">
-                              Public Key
-                            </Label>
-                            <Input
-                              id="publicKey"
-                              value={currAccount}
-                              readOnly
-                              className="cursor-pointer bg-gray-700 text-white px-4 py-2 rounded-md w-full"
-                              onClick={() => handleCopy("public")}
-                            />
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-3 ml-2 rounded-md"
-                            onClick={() => handleCopy("public")}
-                          >
-                            <Copy className="h-5 w-5" />
-                          </Button>
-                        </div>
-
-                        <Canvas
-                          text={currAccount}
-                          options={{
-                            errorCorrectionLevel: "M",
-                            margin: 3,
-                            scale: 4,
-                            width: 200,
-                            color: {
-                              dark: "#000",
-                              light: "#FFF",
-                            },
-                          }}
-                        />
-
-                        <p className="text-gray-400 text-sm text-center mt-4">
-                          Scan the QR code or copy the public key to share your
-                          address.
-                        </p>
-                      </div>
-                      <DialogFooter className="sm:justify-start mt-6">
-                        <DialogClose asChild>
-                          <Button
-                            type="button"
-                            variant="secondary"
-                            className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-md"
-                          >
-                            Close
-                          </Button>
-                        </DialogClose>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </div>
-
-              {/* Transactions */}
-              <div className="w-full mt-6">
-                <h4 className="text-lg text-gray-300 mb-3">
-                  Recent Transactions
-                </h4>
-                <div className="flex flex-col gap-2 overflow-y-scroll max-h-64 scrollbar-hide hide-scrollbar">
-                  {transactions.length > 0 ? (
-                    transactions.map((tx, index) => {
-                      const { meta, transaction, blockTime } = tx || {};
-                      if (!meta || !transaction || !blockTime) return null;
-
-                      const isSent = meta.preBalances[1] > meta.postBalances[1];
-
-                      const amount =
-                        Math.abs(meta.postBalances[1] - meta.preBalances[1]) /
-                        1e9;
-                      const time = new Date(blockTime * 1000).toLocaleString();
-
-                      return (
-                        <div
-                          key={index}
-                          className="p-4 bg-gray-800 rounded-lg flex items-center justify-between text-white shadow-lg"
-                        >
-                          <div className="flex items-center gap-4">
-                            {isSent ? (
-                              <FaArrowUp className="text-red-500" />
-                            ) : (
-                              <FaArrowDown className="text-green-500" />
-                            )}
-                            <div>
-                              <p className="font-medium">
-                                {isSent ? "Sent" : "Received"}
-                              </p>
-                              <p className="text-sm text-gray-400">{time}</p>
+              <>
+                <div className="w-full flex flex-col items-center bg-gray-800 p-4 rounded-lg shadow-lg">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg text-gray-300">Balance</h3>
+                    <p className="text-3xl font-semibold text-white">
+                      {balance?.toFixed(2) || "—"} SOL
+                    </p>
+                    <p className="text-md text-gray-400">
+                      ≈ {usdcAmount?.toFixed(2) || "—"} USDC
+                    </p>
+                  </div>
+                  <div className="flex gap-4">
+                    <Send/>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                            className="bg-blue-500 hover:bg-blue-400 text-white flex items-center gap-2 px-4 py-2 rounded-lg">
+                          <FaArrowDown className="text-xl"/>
+                          Receive
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md bg-gray-800 p-6 rounded-lg shadow-xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-xl font-semibold text-white">
+                            Receive SOL
+                          </DialogTitle>
+                          <DialogDescription className="text-gray-300 mt-2">
+                            Share your public key below to receive payments or
+                            transfers to your account.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="flex flex-col items-center space-y-4 mt-4">
+                          <div className="flex flex-row items-center w-full">
+                            <div className="flex-1">
+                              <Label htmlFor="publicKey" className="sr-only">
+                                Public Key
+                              </Label>
+                              <Input
+                                  id="publicKey"
+                                  value={currAccount}
+                                  readOnly
+                                  className="cursor-pointer bg-gray-700 text-white px-4 py-2 rounded-md w-full"
+                                  onClick={() => handleCopy("public")}
+                              />
                             </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                className="bg-blue-600 hover:bg-blue-500 text-white px-3 ml-2 rounded-md"
+                                onClick={() => handleCopy("public")}
+                            >
+                              <Copy className="h-5 w-5"/>
+                            </Button>
                           </div>
-                          <p className="text-lg font-semibold">
-                            {amount.toFixed(4)} SOL
+
+                          <Canvas
+                              text={currAccount}
+                              options={{
+                                errorCorrectionLevel: "M",
+                                margin: 3,
+                                scale: 4,
+                                width: 200,
+                                color: {
+                                  dark: "#000",
+                                  light: "#FFF",
+                                },
+                              }}
+                          />
+
+                          <p className="text-gray-400 text-sm text-center mt-4">
+                            Scan the QR code or copy the public key to share your
+                            address.
                           </p>
                         </div>
-                      );
-                    })
-                  ) : (
-                    <p className="text-gray-400">
-                      No recent transactions found.
-                    </p>
-                  )}
+                        <DialogFooter className="sm:justify-start mt-6">
+                          <DialogClose asChild>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                className="bg-gray-600 hover:bg-gray-500 text-white px-4 py-2 rounded-md"
+                            >
+                              Close
+                            </Button>
+                          </DialogClose>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
-              </div>
-            </>
+
+
+
+                <div className="w-full">
+                  <h4 className="text-lg text-gray-300 mb-3">Your Tokens</h4>
+                  <div className="flex flex-col gap-4">
+                    {tokens.map((token, index) => (
+                        <Tokens
+                            key={index}
+                            mint={token.mint}
+                            amount={token.amount}
+                            decimals={token.decimals}
+                        />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Transactions */}
+                <div className="w-full mt-6">
+                  <h4 className="text-lg text-gray-300 mb-3">
+                    Recent Transactions
+                  </h4>
+                  <div className="flex flex-col gap-2 overflow-y-scroll max-h-64 scrollbar-hide hide-scrollbar">
+                    {transactions.length > 0 ? (
+                        transactions.map((tx, index) => {
+                          const {meta, transaction, blockTime} = tx || {};
+                          if (!meta || !transaction || !blockTime) return null;
+
+                          const isSent = meta.preBalances[1] > meta.postBalances[1];
+
+                          const amount =
+                              Math.abs(meta.postBalances[1] - meta.preBalances[1]) /
+                              1e9;
+                          const time = new Date(blockTime * 1000).toLocaleString();
+
+                          return (
+                              <div
+                                  key={index}
+                                  className="p-4 bg-gray-800 rounded-lg flex items-center justify-between text-white shadow-lg"
+                              >
+                                <div className="flex items-center gap-4">
+                                  {isSent ? (
+                                      <FaArrowUp className="text-red-500"/>
+                                  ) : (
+                                      <FaArrowDown className="text-green-500"/>
+                                  )}
+                                  <div>
+                                    <p className="font-medium">
+                                      {isSent ? "Sent" : "Received"}
+                                    </p>
+                                    <p className="text-sm text-gray-400">{time}</p>
+                                  </div>
+                                </div>
+                                <p className="text-lg font-semibold">
+                                  {amount.toFixed(4)} SOL
+                                </p>
+                              </div>
+                          );
+                        })
+                    ) : (
+                        <p className="text-gray-400">
+                          No recent transactions found.
+                        </p>
+                    )}
+                  </div>
+                </div>
+              </>
           )}
         </CardFooter>
       </motion.div>
